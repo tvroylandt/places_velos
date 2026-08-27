@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Places Vélo Paris</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg:#eef1ea;
+    --surface:#fbfbf8;
+    --surface-2:#ffffff;
+    --ink:#1c2620;
+    --ink-dim:#4c5850;
+    --line:#d3d9cd;
+    --accent:#2f6f4f;
+    --accent-ink:#f6faf6;
+    --velo:#2f6f4f;
+    --velib:#b5761f;
+    --cargo:#5b4b8a;
+    --shadow: 0 1px 2px rgba(28,38,32,0.06), 0 6px 20px rgba(28,38,32,0.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141a16; --surface:#1b2320; --surface-2:#20281f;
+      --ink:#eef1e9; --ink-dim:#a8b3a4; --line:#33403a;
+      --accent:#6cc397; --accent-ink:#0f1a13;
+      --velo:#6cc397; --velib:#e0a851; --cargo:#a595d6;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141a16; --surface:#1b2320; --surface-2:#20281f;
+    --ink:#eef1e9; --ink-dim:#a8b3a4; --line:#33403a;
+    --accent:#6cc397; --accent-ink:#0f1a13;
+    --velo:#6cc397; --velib:#e0a851; --cargo:#a595d6;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  *{box-sizing:border-box; font-family:'Lexend', system-ui, sans-serif;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{ background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  ::selection{background:var(--accent);color:var(--accent-ink);}
+
+  h1,h2,h3{ text-wrap:balance; margin:0; letter-spacing:-0.01em; }
+  .tabular{ font-variant-numeric: tabular-nums; font-feature-settings:"tnum" 1; }
+
+  header.top{
+    display:flex; align-items:baseline; justify-content:space-between;
+    gap:16px; padding:20px 28px; border-bottom:1px solid var(--line);
+    background:var(--surface); flex-wrap:wrap;
+  }
+  header.top .brand{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  header.top h1{ font-size:1.5rem; font-weight:600; }
+  header.top .sub{ color:var(--ink-dim); font-size:0.85rem; max-width:46ch; }
+  header.top .counts{ display:flex; gap:10px; align-items:center; }
+
+  .src-switch{ display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:none; }
+  .src-switch button{ border:none; border-radius:0; background:var(--surface-2); padding:7px 12px; }
+  .src-switch button + button{ border-left:1px solid var(--line); }
+  .src-switch button.active{ background:var(--accent); color:var(--accent-ink); }
+  .src-switch button:hover{ color:var(--accent); }
+  .src-switch button.active:hover{ color:var(--accent-ink); }
+
+  .src-note{ font-size:0.74rem; color:var(--ink-dim); margin-top:6px; max-width:60ch; }
+
+  .app{
+    display:grid; grid-template-columns: 240px 1fr 300px; gap:1px;
+    background:var(--line); min-height:calc(100vh - 74px);
+  }
+  @media (max-width: 980px){ .app{ grid-template-columns: 1fr; } }
+
+  .panel{ background:var(--surface); padding:18px 20px; overflow:auto; }
+  .panel h2{
+    font-size:0.95rem; font-weight:600; text-transform:uppercase;
+    letter-spacing:0.05em; color:var(--ink-dim); margin-bottom:12px;
+  }
+
+  fieldset{ border:none; padding:0; margin:0 0 20px 0; }
+  fieldset legend{
+    font-size:0.78rem; font-weight:600; text-transform:uppercase;
+    letter-spacing:0.05em; color:var(--ink-dim); padding:0; margin-bottom:8px;
+  }
+
+  .chip-row{ display:flex; flex-direction:column; gap:6px; }
+  .chip{ display:flex; align-items:center; gap:8px; font-size:0.88rem; cursor:pointer; padding:5px 6px; border-radius:6px; }
+  .chip:hover{ background:var(--surface-2); }
+  .chip input{ accent-color: var(--accent); width:15px;height:15px; flex:none; }
+  .chip .swatch{ width:10px; height:10px; border-radius:50%; flex:none; }
+  .chip .lbl{ flex:1; }
+
+  button{
+    font:inherit; cursor:pointer; border-radius:7px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--ink); padding:7px 12px; font-size:0.82rem; font-weight:500;
+  }
+  button:hover{ border-color:var(--accent); color:var(--accent); }
+  button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  button.ghost{ background:transparent; }
+
+  .map-wrap{ background:var(--surface); display:flex; flex-direction:column; min-height:460px; }
+  .map-head{ display:flex; align-items:center; justify-content:space-between; padding-bottom:10px; gap:10px; flex-wrap:wrap; }
+  .map-head h2{ margin:0; font-size:0.95rem; }
+  .map-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .map-tools button.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+
+  .map-canvas-wrap{ position:relative; flex:1; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
+  #leafletMap{ position:absolute; inset:0; background:var(--surface-2); }
+  .leaflet-container{ font-family:'Lexend', system-ui, sans-serif; background:var(--surface-2); }
+
+  .hint-banner{
+    font-size:0.78rem; color:var(--accent); padding:6px 10px; border:1px solid var(--accent);
+    border-radius:8px; margin-top:10px; display:none;
+  }
+  .hint-banner.show{ display:block; }
+
+  .legend{ display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+  .legend .item{ display:flex; align-items:center; gap:6px; font-size:0.78rem; color:var(--ink-dim); }
+  .legend .dot{ width:9px;height:9px;border-radius:50%; }
+
+  .results h2{ margin-bottom:16px; }
+
+  .type-card{
+    border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px;
+    background:var(--surface-2); box-shadow: var(--shadow);
+  }
+  .type-card .row1{ display:flex; align-items:center; justify-content:space-between; }
+  .type-card .name{ display:flex; align-items:center; gap:8px; font-weight:600; font-size:0.92rem; }
+  .type-card .dot{ width:11px;height:11px;border-radius:50%; }
+  .type-card .big{ font-size:1.5rem; font-weight:600; }
+  .type-card .sub{ color:var(--ink-dim); font-size:0.76rem; margin-top:2px; }
+  .bar-track{ height:6px; border-radius:4px; background:var(--line); margin-top:10px; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:4px; }
+
+  .total-card{ border-radius:10px; padding:16px; margin-top:6px; background:var(--ink); color:var(--bg); }
+  :root:not([data-theme="light"]) .total-card,
+  :root[data-theme="dark"] .total-card{ background:var(--surface-2); color:var(--ink); border:1px solid var(--accent); }
+  .total-card .lbl{ text-transform:uppercase; letter-spacing:0.06em; font-size:0.72rem; opacity:0.75; }
+  .total-card .big{ font-size:2rem; font-weight:700; margin-top:4px; }
+  .total-card .sub{ font-size:0.78rem; opacity:0.75; margin-top:4px; }
+
+  .selection-note{
+    font-size:0.78rem; color:var(--ink-dim); padding:8px 10px; border:1px dashed var(--line);
+    border-radius:8px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .selection-note button{ padding:3px 9px; font-size:0.74rem; }
+
+  a{ color:var(--accent); }
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:6px; }
+
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1>Places Vélo Paris</h1>
+    <div>
+      <div class="sub">Sélection sur mesure des emplacements de stationnement vélo — filtrez et tracez une zone au lasso sur la carte pour sommer les places par type.</div>
+      <div class="src-note" id="srcNote"></div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+    <div class="src-switch" id="srcSwitch">
+      <button data-src="official" class="active">Ville de Paris</button>
+      <button data-src="osm">OpenStreetMap (75+93)</button>
+    </div>
+    <div class="counts tabular" id="headerCount"></div>
+  </div>
+</header>
+
+<div class="app">
+  <section class="panel" id="filters">
+    <h2>Filtres</h2>
+    <fieldset>
+      <legend>Type de place</legend>
+      <div class="chip-row" id="typeFilters"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Localisation</legend>
+      <div class="chip-row" id="locFilters"></div>
+    </fieldset>
+    <button class="ghost" id="resetBtn" style="width:100%;">Réinitialiser</button>
+  </section>
+
+  <section class="panel map-wrap">
+    <div class="map-head">
+      <h2>Carte</h2>
+      <div class="map-tools">
+        <button id="lassoBtn">Tracer une sélection (lasso)</button>
+        <button id="clearMapSel" class="ghost">Effacer la sélection</button>
+      </div>
+    </div>
+    <div class="hint-banner" id="drawHint">Cliquez-glissez sur la carte pour dessiner librement le contour de votre zone.</div>
+    <div class="map-canvas-wrap">
+      <div id="leafletMap"></div>
+    </div>
+    <div class="legend">
+      <div class="item"><span class="dot" style="background:var(--velo)"></span>Vélos</div>
+      <div class="item"><span class="dot" style="background:var(--velib)"></span>Vélib'</div>
+      <div class="item"><span class="dot" style="background:var(--cargo)"></span>Vélo-cargo</div>
+    </div>
+  </section>
+
+  <section class="panel results">
+    <h2>Résultats</h2>
+    <div class="selection-note" id="selNote" style="display:none;">
+      <span id="selNoteText"></span>
+      <button id="clearMapSel2" class="ghost">Effacer</button>
+    </div>
+    <div id="typeCards"></div>
+    <div class="total-card">
+      <div class="lbl">Total sélection</div>
+      <div class="big tabular" id="totalBig">0</div>
+      <div class="sub" id="totalSub">0 emplacement</div>
+    </div>
+  </section>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-lasso@2.2.13/dist/leaflet-lasso.umd.min.js"></script>
+<script>
+const DATA_OFFICIAL = __DATA_JSON__;
+const DATA_OSM = __DATA_JSON_OSM__;
+const DATASETS = { official: DATA_OFFICIAL, osm: DATA_OSM };
+
+const TYPE_META = {
+  0: { key:'velo', label:"Vélos", color:'var(--velo)' },
+  1: { key:'velib', label:"Vélib'", color:'var(--velib)' },
+  2: { key:'cargo', label:"Vélo-cargo", color:'var(--cargo)' },
+};
+
+// row schema: [type, places, locIdx, lon, lat]
+
+let currentSrc = 'official';
+let DATA = DATASETS[currentSrc];
+
+const state = {
+  types: new Set([0,1,2]),
+  locExcluded: new Set(), // loc *names* excluded, shared across datasets
+  polygon: null,          // array of [lon,lat], shared across datasets and persists on source switch
+};
+
+function locIncluded(name){ return !state.locExcluded.has(name); }
+
+function pointInPolygon(lon, lat, poly){
+  let inside = false;
+  for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+    const xi=poly[i][0], yi=poly[i][1], xj=poly[j][0], yj=poly[j][1];
+    const intersect = ((yi>lat)!==(yj>lat)) && (lon < (xj-xi)*(lat-yi)/(yj-yi)+xi);
+    if(intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function computeCounts(){
+  const rows = DATA.rows, locs = DATA.locs;
+  const poly = (state.polygon && state.polygon.length>=3) ? state.polygon : null;
+  let velo=0, velib=0, cargo=0, n=0;
+  for(let i=0;i<rows.length;i++){
+    const r = rows[i];
+    const type=r[0], places=r[1], locIdx=r[2], lon=r[3], lat=r[4];
+    if(!state.types.has(type)) continue;
+    if(!locIncluded(locs[locIdx])) continue;
+    if(poly && !pointInPolygon(lon, lat, poly)) continue;
+    n++;
+    if(type===0) velo+=places; else if(type===1) velib+=places; else cargo+=places;
+  }
+  return { n, velo, velib, cargo };
+}
+
+function fmt(n){ return n.toLocaleString('fr-FR'); }
+
+// ---------- Filters UI ----------
+
+function buildTypeFilters(){
+  const el = document.getElementById('typeFilters');
+  el.innerHTML = '';
+  [0,1,2].forEach(t=>{
+    const meta = TYPE_META[t];
+    const label = document.createElement('label');
+    label.className='chip';
+    label.innerHTML = `<input type="checkbox" ${state.types.has(t)?'checked':''} data-t="${t}"><span class="swatch" style="background:${meta.color}"></span><span class="lbl">${meta.label}</span>`;
+    label.querySelector('input').addEventListener('change', e=>{
+      if(e.target.checked) state.types.add(t); else state.types.delete(t);
+      render();
+    });
+    el.appendChild(label);
+  });
+}
+
+function buildLocFilters(){
+  const el = document.getElementById('locFilters');
+  el.innerHTML = '';
+  DATA.locs.forEach((name)=>{
+    const label = document.createElement('label');
+    label.className='chip';
+    label.innerHTML = `<input type="checkbox" ${locIncluded(name)?'checked':''} data-l="${name}"><span class="lbl">${name}</span>`;
+    label.querySelector('input').addEventListener('change', e=>{
+      if(e.target.checked) state.locExcluded.delete(name); else state.locExcluded.add(name);
+      render();
+    });
+    el.appendChild(label);
+  });
+}
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  state.types = new Set([0,1,2]);
+  state.locExcluded = new Set();
+  clearSelection();
+  buildTypeFilters();
+  buildLocFilters();
+  render();
+});
+
+function updateSrcNote(){
+  const meta = DATA.meta || {};
+  document.getElementById('srcNote').textContent = meta.source ? `Source : ${meta.source}${meta.note ? ' — '+meta.note : ''}` : '';
+}
+
+// ---------- Map (Leaflet) ----------
+const map = L.map('leafletMap', { preferCanvas: true, minZoom: 8, maxZoom: 18 });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+}).addTo(map);
+map.setView([48.8566, 2.3522], 12);
+
+const markerLayers = { official: null, osm: null };
+
+function buildMarkers(src){
+  const d = DATASETS[src];
+  const group = L.layerGroup();
+  const colors = { 0: getVar('--velo'), 1: getVar('--velib'), 2: getVar('--cargo') };
+  d.rows.forEach(r=>{
+    const type = r[0], lon = r[3], lat = r[4];
+    const m = L.circleMarker([lat, lon], {
+      radius: type===2 ? 3 : 2,
+      color: colors[type],
+      weight: 0,
+      fillColor: colors[type],
+      fillOpacity: 0.75,
+      interactive: false,
+    });
+    m._type = type;
+    m._locIdx = r[2];
+    group.addLayer(m);
+  });
+  return group;
+}
+
+function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function showMarkersFor(src){
+  Object.values(markerLayers).forEach(g=>{ if(g && map.hasLayer(g)) map.removeLayer(g); });
+  if(!markerLayers[src]) markerLayers[src] = buildMarkers(src);
+  markerLayers[src].addTo(map);
+  applyMarkerVisibility();
+}
+
+function applyMarkerVisibility(){
+  const g = markerLayers[currentSrc];
+  if(!g) return;
+  const locs = DATA.locs;
+  g.eachLayer(m=>{
+    const visible = state.types.has(m._type) && locIncluded(locs[m._locIdx]);
+    m.setStyle({ opacity: visible?1:0, fillOpacity: visible?0.75:0 });
+  });
+}
+
+document.querySelectorAll('.src-switch button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const src = btn.dataset.src;
+    if(src===currentSrc) return;
+    currentSrc = src;
+    DATA = DATASETS[currentSrc];
+    document.querySelectorAll('.src-switch button').forEach(b=>b.classList.toggle('active', b===btn));
+    buildLocFilters();
+    updateSrcNote();
+    showMarkersFor(currentSrc);
+    render();
+  });
+});
+
+// ---------- Lasso selection ----------
+const lasso = L.lasso(map, { intersect: 'contain' });
+let selectionLayer = null;
+
+document.getElementById('lassoBtn').addEventListener('click', ()=>{
+  lasso.enable();
+});
+
+map.on('lasso.finished', e=>{
+  if(e.latLngs.length < 3) return;
+  state.polygon = e.latLngs.map(ll=>[ll.lng, ll.lat]);
+  if(selectionLayer) map.removeLayer(selectionLayer);
+  selectionLayer = L.polygon(e.latLngs, { color: getVar('--accent'), weight:1.5, fillOpacity:0.08 }).addTo(map);
+  render();
+});
+
+function clearSelection(){
+  state.polygon = null;
+  if(selectionLayer){ map.removeLayer(selectionLayer); selectionLayer = null; }
+  render();
+}
+document.getElementById('clearMapSel').addEventListener('click', clearSelection);
+document.getElementById('clearMapSel2').addEventListener('click', clearSelection);
+
+// ---------- Results ----------
+function renderResults(){
+  const c = computeCounts();
+  const total = c.velo + c.velib + c.cargo;
+  document.getElementById('headerCount').textContent = `${fmt(c.n)} / ${fmt(DATA.rows.length)} emplacements`;
+
+  const cardsEl = document.getElementById('typeCards');
+  cardsEl.innerHTML = '';
+  [0,1,2].forEach(t=>{
+    const meta = TYPE_META[t];
+    const v = c[meta.key];
+    const pct = total>0 ? (v/total*100) : 0;
+    const div = document.createElement('div');
+    div.className = 'type-card';
+    div.innerHTML = `
+      <div class="row1">
+        <div class="name"><span class="dot" style="background:${meta.color}"></span>${meta.label}</div>
+        <div class="big tabular">${fmt(v)}</div>
+      </div>
+      <div class="sub">${pct.toFixed(1)}% de la sélection</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${meta.color}"></div></div>
+    `;
+    cardsEl.appendChild(div);
+  });
+
+  document.getElementById('totalBig').textContent = fmt(total);
+  document.getElementById('totalSub').textContent = `${fmt(c.n)} emplacement${c.n>1?'s':''} sélectionné${c.n>1?'s':''} — places`;
+
+  const note = document.getElementById('selNote');
+  if(state.polygon && state.polygon.length>=3){
+    note.style.display='flex';
+    document.getElementById('selNoteText').textContent = `Zone tracée au lasso active (${state.polygon.length} sommets)`;
+  } else {
+    note.style.display='none';
+  }
+}
+
+function render(){
+  renderResults();
+  applyMarkerVisibility();
+}
+
+buildTypeFilters();
+buildLocFilters();
+updateSrcNote();
+showMarkersFor(currentSrc);
+render();
+</script>
+</body>
+</html>
