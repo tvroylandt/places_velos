@@ -108,6 +108,9 @@
   .map-canvas-wrap{ position:relative; flex:1; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
   #leafletMap{ position:absolute; inset:0; background:var(--surface-2); }
   .leaflet-container{ font-family:'Lexend', system-ui, sans-serif; background:var(--surface-2); }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip{ background:var(--surface-2); color:var(--ink); }
+  .leaflet-popup-content{ font-size:0.85rem; line-height:1.5; }
+  .leaflet-container a.leaflet-popup-close-button{ color:var(--ink-dim); }
 
   .hint-banner{
     font-size:0.78rem; color:var(--accent); padding:6px 10px; border:1px solid var(--accent);
@@ -331,22 +334,37 @@ map.setView([48.8566, 2.3522], 12);
 
 const markerLayers = { official: null, osm: null };
 
+const BASE_RADIUS = { 0: 2, 1: 2, 2: 3 };
+function radiusFor(type, zoom){
+  const scale = Math.pow(1.28, zoom - 12);
+  return Math.min(16, Math.max(1.1, BASE_RADIUS[type] * scale));
+}
+
+function popupHtml(d, m){
+  const meta = TYPE_META[m._type];
+  const n = m._places;
+  return `<strong>${meta.label}</strong><br>${n} place${n>1?'s':''} — ${d.locs[m._locIdx]}`;
+}
+
 function buildMarkers(src){
   const d = DATASETS[src];
   const group = L.layerGroup();
   const colors = { 0: getVar('--velo'), 1: getVar('--velib'), 2: getVar('--cargo') };
+  const zoom = map.getZoom();
   d.rows.forEach(r=>{
-    const type = r[0], lon = r[3], lat = r[4];
+    const type = r[0], places = r[1], locIdx = r[2], lon = r[3], lat = r[4];
     const m = L.circleMarker([lat, lon], {
-      radius: type===2 ? 3 : 2,
+      radius: radiusFor(type, zoom),
       color: colors[type],
       weight: 0,
       fillColor: colors[type],
       fillOpacity: 0.75,
-      interactive: false,
+      interactive: true,
     });
     m._type = type;
-    m._locIdx = r[2];
+    m._locIdx = locIdx;
+    m._places = places;
+    m.bindPopup(popupHtml(d, m));
     group.addLayer(m);
   });
   return group;
@@ -370,6 +388,13 @@ function applyMarkerVisibility(){
     m.setStyle({ opacity: visible?1:0, fillOpacity: visible?0.75:0 });
   });
 }
+
+map.on('zoomend', ()=>{
+  const g = markerLayers[currentSrc];
+  if(!g) return;
+  const zoom = map.getZoom();
+  g.eachLayer(m=> m.setRadius(radiusFor(m._type, zoom)));
+});
 
 document.querySelectorAll('.src-switch button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
