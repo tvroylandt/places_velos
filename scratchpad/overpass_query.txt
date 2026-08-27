@@ -1,0 +1,9 @@
+[out:json][timeout:120];
+area["name"="Paris"]["boundary"="administrative"]["admin_level"="8"]->.paris;
+(
+  node["amenity"="bicycle_parking"](area.paris);
+  way["amenity"="bicycle_parking"](area.paris);
+  node["amenity"="bicycle_rental"](area.paris);
+  way["amenity"="bicycle_rental"](area.paris);
+);
+out center tags;

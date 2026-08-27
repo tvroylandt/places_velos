@@ -1,0 +1,14 @@
+[out:json][timeout:180];
+area["name"="Paris"]["boundary"="administrative"]["admin_level"="8"]->.paris;
+area["name"="Seine-Saint-Denis"]["boundary"="administrative"]["admin_level"="6"]->.ssd;
+(
+  node["amenity"="bicycle_parking"](area.paris);
+  way["amenity"="bicycle_parking"](area.paris);
+  node["amenity"="bicycle_rental"](area.paris);
+  way["amenity"="bicycle_rental"](area.paris);
+  node["amenity"="bicycle_parking"](area.ssd);
+  way["amenity"="bicycle_parking"](area.ssd);
+  node["amenity"="bicycle_rental"](area.ssd);
+  way["amenity"="bicycle_rental"](area.ssd);
+);
+out center tags;
